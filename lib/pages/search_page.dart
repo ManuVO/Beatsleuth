@@ -23,14 +23,12 @@ class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
   late Timer _debounceTimer;
 
-  List<Map<String, dynamic>> _playlists = [];
   List<Map<String, dynamic>> _searchResults = [];
   bool _showSearchResults = false;
 
   @override
   void initState() {
     super.initState();
-    _loadPlaylists();
     _searchController.addListener(_onSearchChanged);
     _debounceTimer = Timer(const Duration(milliseconds: 250), () {});
   }
@@ -41,18 +39,6 @@ class _SearchPageState extends State<SearchPage> {
     _searchController.dispose();
     _debounceTimer.cancel();
     super.dispose();
-  }
-
-  Future<void> _loadPlaylists() async {
-    if (widget.data.playlists.isNotEmpty) {
-      _playlists = widget.data.playlists;
-    } else {
-      final playlists = await _spotifyService.getTopPlaylists();
-      setState(() {
-        widget.data.playlists = playlists;
-        _playlists = widget.data.playlists;
-      });
-    }
   }
 
   void _onSearchChanged() async {
@@ -75,7 +61,6 @@ class _SearchPageState extends State<SearchPage> {
 
   void saveFile(String content) async {
     final directory = await getApplicationDocumentsDirectory();
-    //print(directory.path);
     final file = File('${directory.path}/archivo.txt');
     await file.writeAsString(content);
   }
@@ -103,67 +88,9 @@ class _SearchPageState extends State<SearchPage> {
               controller: _searchController,
             ),
           ),
-          Visibility(
-            visible: !_showSearchResults,
-            child: Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(top: 16.0),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Disfruta de las mejores playlist',
-                        style: Theme.of(context).textTheme.displaySmall,
-                      ),
-                      const SizedBox(height: 4.0),
-                      Expanded(
-                        child: GridView.builder(
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2),
-                          itemCount: _playlists.length,
-                          itemBuilder: (context, index) {
-                            final playlist = _playlists[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 4.0, vertical: 16.0),
-                              child: Column(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8.0),
-                                    child: Image.network(
-                                      playlist['images'][0]['url'],
-                                      width: 125,
-                                      height: 125,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8.0),
-                                  Flexible(
-                                    child: Text(
-                                      playlist['name'],
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Visibility(
-            visible: _showSearchResults,
-            child: Expanded(
+          Expanded(
+            child: Visibility(
+              visible: _showSearchResults,
               child: Container(
                 margin: const EdgeInsets.only(bottom: 4.0),
                 child: ListView.separated(
@@ -173,7 +100,6 @@ class _SearchPageState extends State<SearchPage> {
                     final result = _searchResults[index];
                     var jsonString = jsonEncode(_searchResults);
                     saveFile(jsonString);
-                    //print(result);
                     String imageUrl = '';
                     String title = '';
                     String subtitle = '';
@@ -236,7 +162,6 @@ class _SearchPageState extends State<SearchPage> {
         backgroundImage: NetworkImage(imageUrl),
       );
     } else {
-      // Devuelve una imagen normal para otros tipos de objetos
       return Image.network(imageUrl);
     }
   }
@@ -245,10 +170,8 @@ class _SearchPageState extends State<SearchPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SafeArea(
-          child: TrackPage({'track': track}),
+        builder: (context) => TrackPage(trackId: track["id"])
         ),
-      ),
     );
   }
 

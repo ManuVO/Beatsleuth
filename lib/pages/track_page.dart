@@ -2,488 +2,305 @@ import 'package:flutter/material.dart';
 import 'package:beatsleuth2/data/services/spotify_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:percent_indicator/percent_indicator.dart';
-import 'package:expandable_page_view/expandable_page_view.dart';
 import 'package:flutter/cupertino.dart';
 
 class TrackPage extends StatefulWidget {
-  final Map<String, dynamic> cancion;
+  final String trackId;
 
-  TrackPage(this.cancion, {Key? key}) : super(key: key);
+  TrackPage({required this.trackId, Key? key}) : super(key: key);
 
   @override
   _TrackPageState createState() => _TrackPageState();
 }
 
 class _TrackPageState extends State<TrackPage> {
-  final PageController _controller = PageController();
+  late Future<Map<String, dynamic>> _trackDetailsFuture;
+  late Future<Map<String, dynamic>> _audioFeaturesFuture;
+  late Future<List<dynamic>> _recommendationsFuture;
   int _selectedIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    final spotifyService = SpotifyService();
+    _trackDetailsFuture = spotifyService.getTrack(widget.trackId);
+    _audioFeaturesFuture = spotifyService.getAudioFeatures(widget.trackId);
+    _recommendationsFuture = spotifyService.getTrackRecommendations(widget.trackId);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    SpotifyService spotifyService = SpotifyService();
-    Map<String, dynamic> cancion = widget.cancion['track'];
     return Scaffold(
-      body: Stack(
-        children: [
-          FractionallySizedBox(
-            heightFactor: 0.225,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color.fromRGBO(255, 187, 74, 1),
-                    Color.fromRGBO(255, 187, 74, 0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: FutureBuilder<List<dynamic>>(
-              future: Future.wait([
-                spotifyService.getAudioFeatures(cancion['id']),
-                spotifyService.getTrackRecommendations(cancion['id']),
-                spotifyService.getTrack(cancion['id'])
-              ]),
-              builder: (context, snapshot) {
-                print('Track: ${snapshot.data?[2]}');
-                if (snapshot.hasData) {
-                  print('ID cancion: ${cancion['id']}');
-                  final audioFeatures = snapshot.data?[0];
-                  final recommendations = snapshot.data?[1];
-                  final track = snapshot.data?[2];
-                  // Extrae la lista de artistas de la canción
-                  final artists = cancion['artists'];
-                  // Formatea la lista de artistas en el formato deseado
-                  final formattedArtists = artists
-                      .map((artist) => artist['name'])
-                      .join(' feat. ')
-                      .replaceAll(' feat. ', ', ')
-                      .replaceFirst(', ', ' feat. ');
+      body: FutureBuilder<List<dynamic>>(
+        future: Future.wait([
+          _trackDetailsFuture,
+          _audioFeaturesFuture,
+          _recommendationsFuture,
+        ]),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else {
+            final trackDetails = snapshot.data![0];
+            final audioFeatures = snapshot.data![1];
+            final recommendations = snapshot.data![2];
+            final artists = trackDetails['artists'].map((artist) => artist['name']).join(', ');
 
-                  return Align(
-                    alignment: Alignment.topCenter,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.only(top: 32.0),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  spreadRadius: 5,
-                                  blurRadius: 7,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: Image.network(
-                                track['album']['images'][0]['url'],
-                                width: 200,
-                                height: 200,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24.0),
-                          Text(cancion['name'],
-                              style: Theme.of(context).textTheme.displayMedium,
-                              textAlign: TextAlign.center),
-                          const SizedBox(height: 8.0),
-                          Text(formattedArtists,
-                              style: Theme.of(context).textTheme.headlineMedium,
-                              textAlign: TextAlign.center),
-                          const SizedBox(height: 18.0),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 18.0),
-                            child: Divider(),
-                          ),
-                          const SizedBox(height: 12.0),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              if (cancion['preview_url'] != null)
-                                Column(
-                                  children: [
-                                    FloatingActionButton(
-                                      heroTag: 'preview',
-                                      backgroundColor:
-                                          Theme.of(context).focusColor,
-                                      onPressed: cancion['preview_url'] != null
-                                          ? () {
-                                              //Implementar reproductor
-                                              print(cancion['preview_url']);
-                                            }
-                                          : null,
-                                      child: const Icon(Icons.music_note),
-                                    ),
-                                    const SizedBox(height: 8.0),
-                                    Text("Escuchar preview",
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall),
-                                  ],
-                                ),
-                              Column(
-                                children: [
-                                  FloatingActionButton(
-                                    heroTag: 'externalURL',
-                                    backgroundColor: Colors.blue,
-                                    onPressed: cancion['external_urls']
-                                                ['spotify'] !=
-                                            null
-                                        ? () async {
-                                            final url = Uri.parse(
-                                                cancion['external_urls']
-                                                    ['spotify']);
-                                            if (await canLaunchUrl(url)) {
-                                              await launchUrl(url);
-                                            }
-                                          }
-                                        : null,
-                                    child: const Icon(Icons.link),
-                                  ),
-                                  const SizedBox(height: 8.0),
-                                  Text("Ver en Spotify",
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18.0),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 18.0),
-                            child: Divider(),
-                          ),
-                          const SizedBox(height: 12.0),
-                          /*
-                          CupertinoSegmentedControl(
-                            unselectedColor: Colors.grey[100],
-                            children: const {
-                              0: Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Text('Características',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18)),
-                              ),
-                              1: Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Text('Recomendaciones',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18)),
-                              ),
-                            },
-                            groupValue: _selectedIndex,
-                            onValueChanged: (int value) {
-                              setState(() {
-                                _selectedIndex = value;
-                                _controller.animateToPage(value,
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.ease);
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 12.0),
-                          */
-                          ExpandablePageView(
-                            controller: _controller,
-                            children: [
-                              Container(
-                                margin: const EdgeInsets.only(
-                                    left: 32.0, right: 32.0, bottom: 12.0),
-                                decoration: BoxDecoration(
-                                  color: Color.fromARGB(255, 34, 67, 91),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Column(children: [
-                                  const SizedBox(height: 16.0),
-                                  Text("Popularidad",
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge),
-                                  Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceEvenly,
-                                      children: [
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 1.0),
-                                          child: LinearPercentIndicator(
-                                            width: MediaQuery.of(context)
-                                                    .size
-                                                    .width -
-                                                100,
-                                            animation: true,
-                                            lineHeight: 20.0,
-                                            progressColor: Colors.blue,
-                                            percent: track['popularity'] * 0.01,
-                                            center: Text(
-                                                '${track['popularity']}%',
-                                                style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.white)),
-                                            barRadius:
-                                                const Radius.circular(16),
-                                          ),
-                                        )
-                                      ]),
-                                  const SizedBox(height: 16.0),
-                                  Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceEvenly,
-                                      children: [
-                                        Column(
-                                          children: [
-                                            Text("Tono",
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodyLarge),
-                                            Card(
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(10.0),
-                                              ),
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  gradient:
-                                                      const LinearGradient(
-                                                    colors: [
-                                                      Color.fromARGB(
-                                                          255, 34, 150, 243),
-                                                      Color.fromARGB(
-                                                          255, 26, 118, 192)
-                                                    ],
-                                                    begin: Alignment.topCenter,
-                                                    end: Alignment.bottomCenter,
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          10.0),
-                                                ),
-                                                child: Container(
-                                                  constraints:
-                                                      const BoxConstraints(
-                                                          maxWidth: 150,
-                                                          minWidth: 125,
-                                                          maxHeight: 100),
-                                                  child: Wrap(
-                                                    alignment:
-                                                        WrapAlignment.center,
-                                                    children: <Widget>[
-                                                      Padding(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .all(8.0),
-                                                        child: Text(
-                                                            getKey(
-                                                                audioFeatures[
-                                                                    'key'],
-                                                                audioFeatures[
-                                                                    'mode']),
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            style: Theme.of(
-                                                                    context)
-                                                                .textTheme
-                                                                .titleMedium),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        Column(
-                                          children: [
-                                            Text("BPM",
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodyLarge),
-                                            Card(
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(10.0),
-                                              ),
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  gradient:
-                                                      const LinearGradient(
-                                                    colors: [
-                                                      Color.fromARGB(
-                                                          255, 34, 150, 243),
-                                                      Color.fromARGB(
-                                                          255, 26, 118, 192),
-                                                    ],
-                                                    begin: Alignment.topCenter,
-                                                    end: Alignment.bottomCenter,
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          10.0),
-                                                ),
-                                                child: Container(
-                                                  constraints:
-                                                      const BoxConstraints(
-                                                          maxWidth: 150,
-                                                          minWidth: 125,
-                                                          maxHeight: 100),
-                                                  child: Wrap(
-                                                    alignment:
-                                                        WrapAlignment.center,
-                                                    children: <Widget>[
-                                                      Padding(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .all(8.0),
-                                                        child: Text(
-                                                            audioFeatures[
-                                                                    'tempo']
-                                                                .toStringAsFixed(
-                                                                    0),
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            style: Theme.of(
-                                                                    context)
-                                                                .textTheme
-                                                                .titleMedium),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ]),
-                                  const SizedBox(height: 18.0),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      buildCircularPercentIndicator(
-                                          context,
-                                          audioFeatures['danceability'],
-                                          'Bailabilidad'),
-                                      buildCircularPercentIndicator(
-                                          context,
-                                          audioFeatures['acousticness'],
-                                          'Acústica'),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 18.0),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      buildCircularPercentIndicator(context,
-                                          audioFeatures['energy'], 'Energía'),
-                                      buildCircularPercentIndicator(
-                                          context,
-                                          audioFeatures['valence'],
-                                          'Positividad'),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12.0),
-                                ]),
-                              ),
-                              Container(
-                                margin: const EdgeInsets.only(
-                                    left: 32.0, right: 32.0, bottom: 12.0),
-                                decoration: BoxDecoration(
-                                  color: Color.fromARGB(255, 34, 67, 91),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: ListView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: recommendations.length,
-                                  itemBuilder: (context, index) {
-                                    final recommendation =
-                                        recommendations[index];
-
-                                    // Extrae la lista de artistas de la canción
-                                    final recommendationArtists =
-                                        recommendation['artists'];
-
-                                    // Formatea la lista de artistas en el formato deseado
-                                    final formattedArtistsRecommendation =
-                                        recommendationArtists
-                                            .map((artist) => artist['name'])
-                                            .join(' feat. ')
-                                            .replaceAll(' feat. ', ', ')
-                                            .replaceFirst(', ', ' feat. ');
-                                    return Column(
-                                      children: [
-                                        InkWell(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => SafeArea(
-                                                  child: TrackPage({
-                                                    'track': recommendation
-                                                  }),
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                          child: ListTile(
-                                            leading: Image.network(
-                                              recommendation['album']['images']
-                                                  [0]['url'],
-                                              width: 50,
-                                              height: 50,
-                                            ),
-                                            title: Text(recommendation['name'],
-                                                overflow: TextOverflow.ellipsis,
-                                                maxLines: 1),
-                                            subtitle: Text(
-                                                formattedArtistsRecommendation,
-                                                overflow: TextOverflow.ellipsis,
-                                                maxLines: 1),
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              )
-                            ],
-                          )
-                        ],
-                      ),
+            return Stack(
+              children: [
+                // Fondo de gradiente que cubre toda la pantalla
+                Container(
+                  height: MediaQuery.of(context).size.height * 0.32, // Altura total de la pantalla
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color.fromRGBO(255, 187, 74, 1),
+                        Color.fromRGBO(255, 187, 74, 0),
+                      ],
                     ),
-                  );
-                } else {
-                  return const CircularProgressIndicator();
-                }
-              },
-            ),
-          ),
-        ],
+                  ),
+                ),
+                // Contenido principal
+                SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.01), // Espacio para el efecto visual del gradiente
+                      _buildTrackImage(trackDetails['album']['images'][0]['url']),
+                      _buildTrackNameAndArtists(trackDetails['name'], artists),
+                      _buildActionButtonSection(context, trackDetails),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                      _buildTabs(context, trackDetails, audioFeatures, recommendations),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+        },
       ),
     );
   }
 
-  Widget buildCircularPercentIndicator(
-      BuildContext context, dynamic porcentaje, String nombre) {
+  Widget _buildGradientBackground() {
+    return FractionallySizedBox(
+      heightFactor: 0.3,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color.fromRGBO(255, 187, 74, 1),
+              Color.fromRGBO(255, 187, 74, 0),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrackImage(String imageUrl) {
+    return Container(
+      margin: const EdgeInsets.all(32.0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), spreadRadius: 5, blurRadius: 7, offset: const Offset(0, 3))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.network(imageUrl, width: 150, height: 150, fit: BoxFit.cover),
+      ),
+    );
+  }
+
+  Widget _buildTrackNameAndArtists(String name, String artists) {
+    return Column(
+      children: [
+        Text(name, style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
+        const SizedBox(height: 8.0),
+        Text(artists, style: Theme.of(context).textTheme.bodyLarge, textAlign: TextAlign.center),
+        const SizedBox(height: 24.0),
+      ],
+    );
+  }
+
+  Widget _buildActionButtonSection(BuildContext context, Map<String, dynamic> track) {
+    // Ajustado para mantener los colores específicos
+    final previewUrl = track['preview_url'];
+    final spotifyUrl = track['external_urls']['spotify'];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        if (previewUrl != null)
+          _ActionButton(
+            icon: Icons.music_note,
+            label: 'Escuchar Preview',
+            onPressed: () => _launchURL(previewUrl),
+          ),
+        _ActionButton(
+          icon: Icons.link,
+          label: 'Ver en Spotify',
+          onPressed: () => _launchURL(spotifyUrl),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabs(BuildContext context, Map<String, dynamic> track, Map<String, dynamic> audioFeatures, List<dynamic> recommendations) {
+    return Column(
+      children: [
+        CupertinoSegmentedControl<int>(
+          children: {
+            0: const Padding(padding: EdgeInsets.all(8.0), child: Text('Características')),
+            1: const Padding(padding: EdgeInsets.all(8.0), child: Text('Recomendaciones')),
+          },
+          groupValue: _selectedIndex,
+          onValueChanged: (int value) {
+            setState(() {
+              _selectedIndex = value;
+            });
+          },
+        ),
+        SizedBox(height: MediaQuery.of(context).size.height * 0.01),
+        Container( // En lugar de Expanded, usa Container para controlar la altura
+          height: MediaQuery.of(context).size.height * 0.47, // Ajusta este valor según sea necesario
+          child: IndexedStack(
+            index: _selectedIndex,
+            children: [
+              SingleChildScrollView(child: _buildAudioFeatures(context, track, audioFeatures)),
+              SingleChildScrollView(child: _buildRecommendations(context, recommendations)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAudioFeatures(BuildContext context, Map<String, dynamic> track, Map<String, dynamic> audioFeatures) {
+    return SingleChildScrollView(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 12.0),
+        padding: const EdgeInsets.only(top: 10, left: 16.0, right: 16.0, bottom: 16.0),
+        decoration: BoxDecoration(
+          color: Color.fromARGB(255, 34, 67, 91),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          children: [
+            Text("Popularidad", style: Theme.of(context).textTheme.bodyLarge),
+            LinearPercentIndicator(
+              width: MediaQuery.of(context).size.width - 96, // Ajustado para tener en cuenta el padding y margin
+              animation: true,
+              lineHeight: 20.0,
+              progressColor: Colors.blue,
+              percent: track['popularity'] / 100,
+              center: Text('${track['popularity']}%', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+              barRadius: const Radius.circular(16),
+            ),
+            const SizedBox(height: 16.0),
+            Padding(
+              padding: const EdgeInsets.only(left: 35.0, right: 55.0), // Ajusta el valor del padding según necesites
+              child: Center( // Asegura que los elementos de la fila estén centrados
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildAudioFeatureCard(context, "Tono", getKey(audioFeatures['key'], audioFeatures['mode'])),
+                    _buildAudioFeatureCard(context, "BPM", audioFeatures['tempo'].toStringAsFixed(0)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 18.0),
+            // Las filas de CircularPercentIndicator ya deberían estar centradas debido a MainAxisAlignment.spaceEvenly
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                buildCircularPercentIndicator(context, audioFeatures['danceability'], 'Bailabilidad'),
+                buildCircularPercentIndicator(context, audioFeatures['acousticness'], 'Acústica'),
+              ],
+            ),
+            const SizedBox(height: 18.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                buildCircularPercentIndicator(context, audioFeatures['energy'], 'Energía'),
+                buildCircularPercentIndicator(context, audioFeatures['valence'], 'Positividad'),
+              ],
+            ),
+            const SizedBox(height: 12.0),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudioFeatureCard(BuildContext context, String featureName, String featureValue) {
+    return Column(
+      children: [
+        Text(featureName, style: Theme.of(context).textTheme.bodyLarge),
+        Card(
+          color: Colors.blue,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10.0),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              featureValue,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecommendations(BuildContext context, List<dynamic> recommendations) {
+    return Container(
+      margin: const EdgeInsets.only(left: 32.0, right: 32.0, bottom: 12.0),
+      decoration: BoxDecoration(
+        color: Color.fromARGB(255, 34, 67, 91),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.only(top: recommendations.isNotEmpty ? 5 : 0.0), // Reducido el espacio superior
+        itemCount: recommendations.length,
+        itemBuilder: (context, index) {
+          final recommendation = recommendations[index];
+          final formattedArtistsRecommendation = recommendation['artists'].map((artist) => artist['name']).join(', ');
+          
+          return InkWell(
+            onTap: () {
+              // Implementar navegación a detalles de la recomendación si es necesario
+            },
+            child: ListTile(
+              leading: Image.network(recommendation['album']['images'][0]['url'], width: 50, height: 50),
+              title: Text(recommendation['name'], overflow: TextOverflow.ellipsis, maxLines: 1),
+              subtitle: Text(formattedArtistsRecommendation, overflow: TextOverflow.ellipsis, maxLines: 1),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _launchURL(String url) async {
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url));
+    } else {
+      // Manejo de errores si no se puede lanzar la URL
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo abrir el enlace')));
+    }
+  }
+
+  Widget buildCircularPercentIndicator(BuildContext context, dynamic porcentaje, String nombre) {
     return CircularPercentIndicator(
       header: Text(nombre, style: Theme.of(context).textTheme.bodyLarge),
       radius: 60.0,
@@ -521,5 +338,29 @@ class _TrackPageState extends State<TrackPage> {
     } else {
       return 'Desconocida';
     }
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  const _ActionButton({Key? key, required this.icon, required this.label, required this.onPressed}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        FloatingActionButton(
+          heroTag: null, // Asegurar que cada botón tenga un heroTag único
+          backgroundColor: Theme.of(context).focusColor,
+          onPressed: onPressed,
+          child: Icon(icon),
+        ),
+        const SizedBox(height: 8.0),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
   }
 }

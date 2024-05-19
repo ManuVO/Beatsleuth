@@ -64,9 +64,6 @@ class _AdvancedSearchPageState extends State<AdvancedSearchPage> {
   }
 
   void _performAdvancedSearch() async {
-    print('Búsqueda avanzada con los siguientes parámetros:');
-    print('Song: $selectedSongId');
-    print('Popularity Min: $popularityMin');
     // Realiza una búsqueda avanzada utilizando los filtros
     var results = await _spotifyService.advancedSearch(
         song: selectedSongId,
@@ -82,10 +79,6 @@ class _AdvancedSearchPageState extends State<AdvancedSearchPage> {
         positivityMax: positivityMax,
         tone: tone,
         bpm: bpm);
-    print('Número de resultados obtenidos: ${results.length}');
-    if (results.isNotEmpty) {
-      print('Primer resultado: ${results[0]}');
-    }
     setState(() {
       _advancedSearchResults = results;
       _showAdvancedResults = true;
@@ -483,9 +476,7 @@ class _AdvancedSearchPageState extends State<AdvancedSearchPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SafeArea(
-          child: TrackPage({'track': track}),
-        ),
+        builder: (context) => TrackPage(trackId: track["id"])
       ),
     );
   }

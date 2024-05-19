@@ -119,6 +119,18 @@ class SpotifyService {
     final popularSongs =
         List<Map<String, dynamic>>.from(allSongs.take(10).toList());
 
+/*
+    // Suponiendo que popularSongs es una List<Map<String, dynamic>> con los datos de las canciones
+    for (var song in popularSongs) {
+      // Accede a los valores que quieras imprimir de cada canción
+      var songId = song['track']['id']; // ID de la canción
+      var songName = song['track']['name']; // Nombre de la canción
+      var artistName = song['track']['artists'][0]['name']; // Nombre del primer artista
+
+      // Imprime los detalles de la canción
+      print('ID de la Canción: $songId, Nombre de la Canción: $songName, Artista: $artistName');
+    }
+*/
     return popularSongs;
   }
 
@@ -376,6 +388,7 @@ class SpotifyService {
 
     // Decodifica la respuesta y devuelve los datos de las características de audio
     final data = jsonDecode(response.body);
+    print(data);
     return data;
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:beatsleuth2/pages/wrapper_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -7,6 +8,18 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    // Asegúrate de limpiar los controladores cuando se deshaga el Widget
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,6 +69,7 @@ class _LoginPageState extends State<LoginPage> {
                 height: 10,
               ),
               TextField(
+                controller: _emailController,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                     filled: true,
@@ -72,6 +86,7 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 10),
               TextField(
                 obscureText: true,
+                controller: _passwordController,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                     filled: true,
@@ -129,32 +144,80 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  void showCustomErrorSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white), // Texto blanco para contrastar con el borde
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.grey[800], // Un fondo oscuro pero no totalmente negro
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.redAccent, width: 2), // Borde rojo para el mensaje de error
+        ),
+        margin: const EdgeInsets.only(bottom: 50, left: 15, right: 15),
+      ),
+    );
+  }
+
+  void showCustomSuccessSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white), // Texto blanco para contrastar con el borde
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.grey[800], // Un fondo oscuro pero no totalmente negro
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.greenAccent, width: 2), // Borde rojo para el mensaje de error
+        ),
+        margin: const EdgeInsets.only(bottom: 50, left: 15, right: 15),
+      ),
+    );
+  }
+
   void _loginUser() async {
     try {
-      /*
-    await _firebaseService.loginUser(
-      _emailController.text,
-      _passwordController.text,
-    );
-    */
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Has iniciado sesión correctamente'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          margin: const EdgeInsets.only(bottom: 50, left: 15, right: 15),
-        ),
+      final String email = _emailController.text.trim();
+      final String password = _passwordController.text.trim();
+
+      if (email.isEmpty || password.isEmpty) {
+        showCustomErrorSnackBar(context, 'Correo electrónico y contraseña no pueden estar vacíos');
+        return;
+      }
+
+      // Usa FirebaseAuth para iniciar sesión con el correo electrónico y contraseña proporcionados
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
       );
+
+      // Si el inicio de sesión es exitoso, muestra un SnackBar y redirige al usuario
+      showCustomSuccessSnackBar(context, 'Has iniciado sesión correctamente');
+      
+
       Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-              builder: (context) => SafeArea(child: WrapperPage())),
-          (Route<dynamic> route) => false);
+        context,
+        MaterialPageRoute(builder: (context) => SafeArea(child: WrapperPage())),
+        (Route<dynamic> route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      // Aquí puedes personalizar el mensaje basado en el código de error de FirebaseAuth
+      String errorMessage = 'Error desconocido';
+      if (e.code == 'user-not-found') {
+        errorMessage = 'No se encontró el usuario';
+      } else if (e.code == 'wrong-password') {
+        errorMessage = 'Contraseña incorrecta';
+      }
+      // Usa el método personalizado para mostrar el SnackBar
+      showCustomErrorSnackBar(context, errorMessage);
     } catch (e) {
-      // Ocurrió un error al registrar al usuario
-      // Aquí puedes agregar código para manejar el error y mostrar un mensaje al usuario
+      // Cualquier otro error
+      showCustomErrorSnackBar(context, 'Error: ${e.toString()}');
     }
   }
 }

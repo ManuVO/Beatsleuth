@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SignupPage extends StatefulWidget {
   @override
@@ -136,6 +137,11 @@ class _SignupPageState extends State<SignupPage> {
                       hintText: 'Introduce tu contraseña',
                       hintStyle: TextStyle(color: Colors.grey[300])),
                 ),
+                const SizedBox(height: 5),
+                Text(
+                  'Min 1 mayús, 1 minús, 1 número, 1 carácter especial, 6 caracteres total',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                ),
                 const SizedBox(height: 15),
                 const Text(
                   'Confirmar contraseña',
@@ -220,7 +226,7 @@ class _SignupPageState extends State<SignupPage> {
 
   void _validatePassword() {
     final password = _passwordController.text;
-    final passwordRegex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$');
+    final passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$');
     setState(() {
       _isPasswordValid = passwordRegex.hasMatch(password);
     });
@@ -233,28 +239,71 @@ class _SignupPageState extends State<SignupPage> {
     });
   }
 
-  void _registerUser() async {
-  try {
-    /*
-    await _firebaseService.registerUser(
-      _emailController.text,
-      _passwordController.text,
-    );
-    */
+  void showCustomErrorSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Te has registrado correctamente'),
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white), // Texto blanco para contrastar con el borde
+        ),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.grey[800], // Un fondo oscuro pero no totalmente negro
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.redAccent, width: 2), // Borde rojo para el mensaje de error
         ),
         margin: const EdgeInsets.only(bottom: 50, left: 15, right: 15),
       ),
     );
-    Navigator.pop(context);
-  } catch (e) {
-    // Ocurrió un error al registrar al usuario
-    // Aquí puedes agregar código para manejar el error y mostrar un mensaje al usuario
   }
-}
+
+  void showCustomSuccessSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white), // Texto blanco para contrastar con el borde
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.grey[800], // Un fondo oscuro pero no totalmente negro
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.greenAccent, width: 2), // Borde rojo para el mensaje de error
+        ),
+        margin: const EdgeInsets.only(bottom: 50, left: 15, right: 15),
+      ),
+    );
+  }
+
+  void _registerUser() async {
+    if (_isEmailValid && _isPasswordValid && _isConfirmPasswordValid) {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+
+      try {
+        final UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+
+        showCustomSuccessSnackBar(context, 'Te has registrado correctamente');
+
+        Navigator.pop(context);
+
+      } on FirebaseAuthException catch (e) {
+        String message = 'Ocurrió un error al registrar al usuario';
+        if (e.code == 'weak-password') {
+          message = 'La contraseña es muy débil';
+        } else if (e.code == 'email-already-in-use') {
+          message = 'El correo electrónico ya está en uso';
+        }
+        showCustomErrorSnackBar(context, message);
+      } catch (e) {
+        // Cualquier otro error
+        showCustomErrorSnackBar(context, 'Error: ${e.toString()}');
+      }
+    } else {
+      showCustomErrorSnackBar(context, 'Por favor corrija los errores antes de continuar.');
+    }
+  }
 }

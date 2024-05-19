@@ -1,20 +1,20 @@
 import 'package:beatsleuth2/data/services/spotify_service.dart';
 
 class HomePageData {
-  List<Map<String, dynamic>> albumes = [];
-  List<Map<String, dynamic>> artistas = [];
-  List<Map<String, dynamic>> canciones = [];
+  List<Map<String, dynamic>> albums = [];
+  List<Map<String, dynamic>> artists = [];
+  List<Map<String, dynamic>> tracks = [];
 
   Future<void> fetchData() async {
     final spotifyService = SpotifyService();
 
     // Obtiene los álbumes más populares
-    albumes = await spotifyService.getPopularAlbums();
+    albums = await spotifyService.getPopularAlbums();
 
     // Obtiene los artistas más populares
-    artistas = await spotifyService.getPopularArtists();
+    artists = await spotifyService.getPopularArtists();
 
     // Obtiene las canciones más populares
-    canciones = await spotifyService.getPopularSongs();
+    tracks = await spotifyService.getPopularSongs();
   }
 }

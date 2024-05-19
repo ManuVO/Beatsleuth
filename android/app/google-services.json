@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "386644677721",
+    "project_id": "beatsleuth-b222f",
+    "storage_bucket": "beatsleuth-b222f.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:386644677721:android:289686c32cc48399000d48",
+        "android_client_info": {
+          "package_name": "com.mavo.beatsleuth"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDG5_C5JkuIcKe6CqpacSY55rssx2PKX24"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

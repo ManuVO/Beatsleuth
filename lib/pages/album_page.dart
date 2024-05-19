@@ -6,20 +6,27 @@ import 'track_page.dart';
 class AlbumPage extends StatefulWidget {
   final String albumId;
 
-  AlbumPage(this.albumId);
+  AlbumPage(this.albumId, {Key? key}) : super(key: key);
 
   @override
   _AlbumPageState createState() => _AlbumPageState();
 }
 
 class _AlbumPageState extends State<AlbumPage> {
-  SpotifyService _spotifyService = SpotifyService();
+  late Future<Map<String, dynamic>> _albumFuture;
+  final SpotifyService _spotifyService = SpotifyService();
+
+  @override
+  void initState() {
+    super.initState();
+    _albumFuture = _spotifyService.getAlbum(widget.albumId);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: FutureBuilder<Map<String, dynamic>>(
-        future: _spotifyService.getAlbum(widget.albumId),
+        future: _albumFuture,
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             final albumData = snapshot.data!;
@@ -127,11 +134,12 @@ class _AlbumPageState extends State<AlbumPage> {
                           .replaceFirst(', ', ' feat. ');
                       return InkWell(
                         onTap: () {
+                          print('Track seleccionado: $track');
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) => SafeArea(
-                                    child: TrackPage({'track': track}))),
+                              builder: (context) => TrackPage(trackId: track["id"])
+                            ),
                           );
                         },
                         child: Container(
@@ -158,7 +166,7 @@ class _AlbumPageState extends State<AlbumPage> {
                                     width: 40,
                                     height: 40,
                                     child: FloatingActionButton(
-                                      heroTag: 'preview$index',
+                                      heroTag: 'albumTrackpreview${track['id'] ?? index}',
                                       backgroundColor:
                                           Theme.of(context).focusColor,
                                       onPressed: track['preview_url'] != null
@@ -175,7 +183,7 @@ class _AlbumPageState extends State<AlbumPage> {
                                   width: 40,
                                   height: 40,
                                   child: FloatingActionButton(
-                                    heroTag: 'externalURL$index',
+                                    heroTag: 'albumTrackExternalURL${track['id'] ?? index}',
                                     backgroundColor: Colors.blue,
                                     onPressed: track['external_urls']
                                                 ['spotify'] !=
